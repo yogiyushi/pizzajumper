@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Pizza Jumper</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+      /* For sharp pixel art */
+    }
+
+    #pause-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #stats {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <canvas id="game"></canvas>
+  <button id="pause-btn" style="display:none;">Pause</button>
+  <div id="stats"></div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const pauseBtn = document.getElementById('pause-btn');
+    const statsDiv = document.getElementById('stats');
+
+    // Set canvas to full-screen
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let bananaWidth, bananaHeight, bombWidth, bombHeight, monkeyWidth, monkeyHeight;
+
+    // Game variables
+    let player = { x: canvas.width / 3, y: canvas.height, width: 30, height: 50, legPosition: 0, lives: 3 };
+    let velocity = 0;
+    let gravity = 0.4;
+    let bananas = [];
+    let bombs = [];
+    let clouds = [];
+    let trees = [];
+    let treeMinHeight = canvas.height / 10;
+    let treeMaxHeight = canvas.height * .4;
+    let bananasGrabbed = 0;
+    let isPaused = false;
+    let deltaTime = 0;
+
+    canvas.height = window.innerHeight;
+    let previousTime = performance.now();
+
+    let bubbles = [];
+    let totalobjectloaded = 0;
+
+    // Bubble properties
+    const bubbleSpeed = 3; // Set the speed at which bubbles move left
+    const bubbleSpeedup = 0.5; // Set the speed at which bubbles drift upward
+    const bubbleFadeRate = 0.01; // Set the rate at which bubbles fade out
+    var bubbleSize = 10; // Set the rate at which bubbles fade out
+
+    // Load images
+    const bananaImg = new Image();
+    bananaImg.src = 'banana.png';
+    const bombImg = new Image();
+    bombImg.src = 'bomb.png';
+    const monkeyImg = new Image();
+    monkeyImg.src = 'monkey.png';
+
+    const bgMusic = new Audio('mario.mp3'); // Replace 'background_music.mp3' with your actual music file
+    let isMusicPlaying = false;
+
+    // Check if the audio is loaded every second
+    const checkAudioLoaded = setInterval(function () {
+      if (bgMusic.readyState >= 2) {
+        // Audio is loaded and ready to play
+        //  alert("audio loaded")
+        totalobjectloaded += 1;
+        console.log('Audio loaded');
+        clearInterval(checkAudioLoaded); // Stop checking
+      }
+    }, 1000);
+
+
+    bananaImg.onload = function () {
+      const targetHeight = canvas.height * 0.1; // 10% of screen height
+      const aspectRatio = bananaImg.width / bananaImg.height;
+      bananaWidth = targetHeight * aspectRatio;
+      bananaHeight = targetHeight;
+      totalobjectloaded += 1;
+    }
+
+    bombImg.onload = function () {
+      const targetHeight = canvas.height * 0.1; // 10% of screen height
+      const aspectRatio = bombImg.width / bombImg.height;
+      bombWidth = targetHeight * aspectRatio;
+      bombHeight = targetHeight;
+      totalobjectloaded += 1;
+    }
+
+    monkeyImg.onload = function () {
+      const targetHeight = player.height * 2; // 80% of player height
+      const aspectRatio = monkeyImg.width / monkeyImg.height;
+      monkeyWidth = targetHeight * aspectRatio;
+      monkeyHeight = targetHeight;
+      totalobjectloaded += 1;
+    }
+
+    function playAudio(x) {
+
+      var audio = new Audio(x+'.mp3');
+      audio.play();
+
+    }
+
+
+    function playSound() {
+      // Create an audio element
+      var audio = new Audio('coin.mp3');
+      // Play the audio
+      audio.play();
+    }
+
+    function playBomb() {
+      // Create an audio element
+      var audio = new Audio('bomb.mp3');
+      // Play the audio
+      audio.play();
+    }
+
+    function playDie() {
+      // Create an audio element
+      var audio = new Audio('die.wav');
+      // Play the audio
+      audio.play();
+    }
+
+    function playBackgroundMusic() {
+      // Start background music after the first jump
+      if (!isMusicPlaying) {
+        bgMusic.loop = true; // Set the music to loop continuously
+        bgMusic.play();
+        isMusicPlaying = true;
+      }
+    }
+
+    function playFart() {
+ 
+      // Play Fart audio
+      audio.play('fart' + randomNumber);    
+
+      // Add a new bubble
+      bubbles.push({
+        bubbleSize: Math.floor(Math.random() * 15) + 1,
+        x: player.x + player.width / 2,
+        y: player.y,
+        opacity: 0.9,
+      });
+
+       // Add a new bubble
+      let randomN = Math.floor(Math.random() * 21) - 10;     
+      bubbles.push({
+        bubbleSize: Math.floor(Math.random() * 15) + 1,
+        x: player.x + player.width / 2 + randomN,
+        y: player.y + randomN,
+        opacity: 0.9, 
+      });
+
+       // Add a new bubble
+      let randomN2 = Math.floor(Math.random() * 41) - 20;   
+      bubbles.push({
+        bubbleSize: Math.floor(Math.random() * 15) + 1,
+        x: player.x + player.width / 2 - randomN2,
+        y: player.y - randomN2,
+        opacity: 0.9, 
+      });
+      monkeyImg.src = 'monkey_jump.png';
+    }
+
+   // Draw the bubble
+    function drawBubbles() {
+      for (let i = bubbles.length - 1; i >= 0; i--) {
+        const bubble = bubbles[i];    
+
+        var randomNumber = Math.floor(Math.random() * 7) + 3;
+        const bubbleRadius = bubble.bubbleSize; // Set the radius of the bubbles
+
+        ctx.beginPath();
+        ctx.arc(bubble.x, bubble.y, bubbleRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = `rgba(255, 255, 255, ${bubble.opacity})`;
+        ctx.fill();
+
+
+        // Update the bubble position and opacity
+        bubble.x -= bubbleSpeed;
+        bubble.y -= bubbleSpeedup;
+        bubble.opacity -= bubbleFadeRate;
+
+        // Remove the bubble if it's off-screen or faded out
+        if (bubble.x + bubbleRadius < 0 || bubble.opacity <= 0) {
+          bubbles.splice(i, 1);
+        }
+      }
+    }
+
+   
+    // Game loop
+    function gameLoop(currentTime) {
+      if (!isPaused) {
+        // Calculate delta time in seconds
+        const deltaTime = (currentTime - previousTime) / 1000;
+        previousTime = currentTime;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw background
+        drawBackground();
+
+        // Draw bananas
+        drawBananas();
+
+        // Draw bombs
+        drawBombs();
+
+        // Draw player
+        drawPlayer();
+
+        // Draw stats
+        drawStats();
+
+        // Draw bubbles  
+        drawBubbles();
+
+        velocity += gravity;
+        player.y += velocity;
+
+        
+        // Check for collisions
+        checkCollisions();
+
+        // Check if the player goes off-screen to the left
+        if (player.x + player.width < 0) {
+          player.lives--;
+          // Restart player from ground position if any lives are left
+          if (player.lives > 0) {
+            player.x = canvas.width / 3;
+            player.y = canvas.height - player.height - 40;
+            velocity = 0;
+          }
+        }
+      }
+
+
+      // Request next frame
+      requestAnimationFrame(gameLoop);
+    }
+
+
+
+    // Draw background
+    function drawBackground() {
+      // Sky
+      ctx.fillStyle = '#87CEEB';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      
+      // Clouds
+      ctx.fillStyle = '#FFFFFF';
+      for (let i = 0; i < clouds.length; i++) {
+        ctx.fillRect(clouds[i].x, clouds[i].y, 60, 30);
+        ctx.fillRect(clouds[i].x + 80, clouds[i].y + 30, 40, 20);
+        // Cloud speed
+        clouds[i].x -= 1;
+        if (clouds[i].x <= -100) {
+          clouds[i].x = canvas.width;
+          clouds[i].y = Math.random() * (canvas.height * 0.3);
+        }
+      }
+
+      // Trees
+      ctx.fillStyle = '#3C5B37';
+      for (let i = 0; i < trees.length; i++) {
+        ctx.fillRect(trees[i].x, canvas.height - trees[i].height, trees[i].width, trees[i].height);
+        trees[i].x -= 2;
+        if (trees[i].x <= -trees[i].width) {
+          trees[i].x = canvas.width;
+          trees[i].width = Math.random() * (20) + 20;
+          trees[i].height = Math.random() * (treeMaxHeight - treeMinHeight) + treeMinHeight;
+        }
+      }
+
+      // Ground
+      ctx.fillStyle = '#8B7D6B';
+      ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+    }
+
+    // Draw bananas
+    function drawBananas() {
+      if (bananaWidth && bananaHeight) {
+        for (let i = 0; i < bananas.length; i++) {
+          ctx.drawImage(bananaImg, bananas[i].x, bananas[i].y, bananaWidth, bananaHeight);
+          bananas[i].x -= 3;
+
+          // Check if the banana moves off-screen to the left
+          //  if (bananas[i].x <= -bananaWidth) {
+          //     bananas.splice(i, 1); // Remove the banana from the array
+          //   player.lives--; // Decrement the player's lives
+          // playAudio("bonb");
+          // Restart player from ground position if any lives are left
+          //  if (player.lives > 0) {
+          //    player.x = canvas.width / 3;
+          //    player.y = canvas.height - player.height - 40;
+          //    velocity = 0;
+          //  }
+          // }
+
+        }
+      }
+    }
+
+    // Draw bombs
+    function drawBombs() {
+      if (bombWidth && bombHeight) {
+        for (let i = 0; i < bombs.length; i++) {
+          ctx.drawImage(bombImg, bombs[i].x, bombs[i].y, bombWidth, bombHeight);
+          bombs[i].x -= 3;
+        }
+      }
+    }
+
+
+    // Draw player
+    function drawPlayer() {
+      // Body
+      // ctx.fillStyle = 'black';
+      //     ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Head (monkey)
+      //ctx.drawImage(monkeyImg, player.x, player.y - monkeyHeight , monkeyWidth, monkeyHeight);
+      ctx.drawImage(monkeyImg, player.x, player.y - 30, monkeyWidth, monkeyHeight);
+
+      // Legs
+      /*
+           ctx.fillStyle = 'black';
+           if (velocity !== 0) {
+             player.legPosition = (player.legPosition + 1) % 10;
+           } else {
+             player.legPosition = 0;
+           }
+           ctx.fillRect(player.x, player.y + player.height, player.width / 2, player.height / 4 - player.legPosition * 2);
+           ctx.fillRect(player.x + player.width / 2, player.y + player.height, player.width / 2, player.height / 4 + player.legPosition * 2);
+           */
+    }
+
+
+
+    // Draw stats
+    function drawStats() {
+      ctx.font = "40px  Arial";
+      ctx.fillStyle = "black";
+      ctx.fillText(`Pizza's: ${bananasGrabbed}`, 10, 40);
+      ctx.fillText(`Lives: ${player.lives}`, 10, 80);
+    }
+
+    // Check for collisions
+    function checkCollisions() {
+      if (player.y + player.height >= canvas.height - 40) {
+        velocity = 0;
+        player.y = canvas.height - player.height - 40;
+      }
+
+      // Check collisions with bananas
+      if (bananaWidth && bananaHeight) {
+        for (let i = 0; i < bananas.length; i++) {
+          if (
+            player.x < bananas[i].x + bananaWidth &&
+            player.x + player.width > bananas[i].x &&
+            player.y < bananas[i].y + bananaHeight &&
+            player.y + player.height > bananas[i].y
+          ) {
+            bananas.splice(i, 1);
+            bananasGrabbed++;
+            playAudio("coin");
+          }
+        }
+      }
+
+      // Check collisions with bombs
+      if (bombWidth && bombHeight) {
+        for (let i = 0; i < bombs.length; i++) {
+          if (
+            player.x < bombs[i].x + bombWidth &&
+            player.x + player.width > bombs[i].x &&
+            player.y < bombs[i].y + bombHeight &&
+            player.y + player.height > bombs[i].y
+          ) {
+            bombs.splice(i, 1);
+            player.lives--;
+            playAudio("bonb");
+          }
+        }
+      }
+
+
+      // Game over if lives are zero
+      if (player.lives <= 0) {
+        gameOver();
+      }
+    }
+
+
+    // Game over function
+    function gameOver() {
+      // Display game over message
+      ctx.font = "50px Arial";
+      ctx.fillStyle = "red";
+      ctx.textAlign = "center";
+      ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
+      playAudio("die");
+      // Stop game loop
+      isPaused = true;
+
+      // Stop background music
+      bgMusic.pause();
+      bgMusic.currentTime = 0; // Reset the music to the beginning
+    }
+
+
+    // Add event listeners
+
+    document.addEventListener('keydown', function (event) {
+      if (event.code === 'Space') {
+        velocity = -10; // Add this line   
+        monkeyImg.src = 'monkey_jump.png';
+        playFart();        
+        playBackgroundMusic();
+      }
+    });
+
+    document.addEventListener('keyup', function (event) {
+      if (event.code === 'Space') {
+        monkeyImg.src = 'monkey.png';
+      }
+    });
+
+    // Add touch event listener to the canvas
+    canvas.addEventListener('touchstart', function (event) {
+      event.preventDefault(); // Prevent default touch behavior (e.g., scrolling)  
+      velocity = -10; // Add this line
+      monkeyImg.src = 'monkey_jump.png';
+      playFart();
+
+    });
+
+    // Add touch event listener to the canvas
+    canvas.addEventListener('touchend', function (event) {
+      event.preventDefault(); // Prevent default touch behavior (e.g., scrolling) 
+      monkeyImg.src = 'monkey.png';
+      playBackgroundMusic();
+    });
+
+
+    // Add bananas
+    function spawnBananas() {
+      if (bananaHeight) {
+        const minHeight = bananaHeight;
+        const maxHeight = canvas.height * 0.7;
+        const randomHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+        bananas.push({ x: canvas.width, y: canvas.height - randomHeight - 100 });
+      }
+    }
+    setInterval(spawnBananas, Math.random() * 1000 + 500); // Random interval between 500 and 1500 ms
+
+
+    // Add bombs
+    function spawnBombs() {
+      if (bombHeight) {
+        const minHeight = bombHeight;
+        const maxHeight = canvas.height * 0.7;
+        const randomHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+        bombs.push({ x: canvas.width, y: canvas.height - randomHeight - 100 });
+      }
+    }
+    setInterval(spawnBombs, Math.random() * 2000 + 1000); // Random interval between 1000 and 3000 ms
+
+    // Initialize clouds and trees
+    for (let i = 0; i < 10; i++) {
+      clouds.push({ x: Math.random() * canvas.width, y: Math.random() * (canvas.height * 0.3) });
+    }
+
+    for (let i = 0; i < 10; i++) {
+      const treeWidth = Math.random() * (100 - 40) + 40;
+      const treeHeight = Math.random() * (treeMaxHeight - treeMinHeight) + treeMinHeight;
+      trees.push({ x: i * 100, width: treeWidth, height: treeHeight });
+    }
+
+    // Pause/Resume game
+    pauseBtn.addEventListener('click', function () {
+      isPaused = !isPaused;
+      pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+    });
+
+   
+    window.onload = function () {
+    } 
+
+
+    // Check if ALL assetts loaded
+    const checkAllLoaded = setInterval(function () {
+      totalobjectloaded == 0
+      //alert("totalobjectloaded = "+ totalobjectloaded)    
+      if (totalobjectloaded == 4) {        
+        totalobjectloaded == 0
+        clearInterval(checkAllLoaded); // Stop checking
+        gameLoop(performance.now());
+      }
+    }, 1000);
+
+  </script>
+</body>
+
+
+</html>
